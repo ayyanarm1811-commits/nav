@@ -1,157 +1,668 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>College Navigation</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Wayfinder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-body{
-    font-family:Arial;
-    background:#f4f4f4;
-    text-align:center;
-    margin-top:80px;
-}
-.container{
-    width:350px;
-    margin:auto;
-    background:white;
-    padding:20px;
-    border-radius:10px;
-    box-shadow:0 0 10px gray;
-}
-input{
-    width:80%;
-    padding:10px;
-    font-size:18px;
-}
-button{
-    padding:10px 20px;
-    margin-top:15px;
-    font-size:18px;
-    background:green;
-    color:white;
-    border:none;
-    border-radius:5px;
-    cursor:pointer;
-}
-button:hover{
-    background:darkgreen;
-}
-#result{
-    margin-top:20px;
-    font-size:20px;
-    color:blue;
-    font-weight:bold;
-}
-</style>
+  :root{
+    --ink:#12233b;
+    --paper:#f6f3ea;
+    --blueprint:#0f2c4c;
+    --blueprint-line: rgba(255,255,255,0.06);
+    --amber:#f4a900;
+    --amber-dark:#c9860a;
+    --teal:#1f7a72;
+    --teal-dark:#155b55;
+    --coral:#e0623b;
+    --muted:#6b7688;
+    --card:#ffffff;
+    --radius:14px;
+    --shadow: 0 10px 30px rgba(15,44,76,0.12);
+  }
 
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    font-family:'Inter', sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  a, button, input{font-family:inherit;}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    background:
+      repeating-linear-gradient(0deg, var(--blueprint-line) 0 1px, transparent 1px 40px),
+      repeating-linear-gradient(90deg, var(--blueprint-line) 0 1px, transparent 1px 40px),
+      linear-gradient(160deg, var(--blueprint), #0a1f38 80%);
+    color:#eef3f8;
+    padding:56px 24px 84px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+
+  .hero::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:60px;
+    background:var(--paper);
+    clip-path: polygon(0 100%, 100% 100%, 100% 0, 0 100%);
+  }
+  .hero::before{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:60px;
+    background:var(--paper);
+    clip-path: polygon(0 100%, 100% 100%, 0 0);
+  }
+
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--amber);
+    background:rgba(244,169,0,0.12);
+    border:1px solid rgba(244,169,0,0.35);
+    padding:6px 14px;
+    border-radius:999px;
+    margin-bottom:22px;
+  }
+  .eyebrow svg{width:14px;height:14px;}
+
+  h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:clamp(32px, 5vw, 48px);
+    margin:0 0 10px;
+    letter-spacing:-0.01em;
+  }
+
+  .hero p{
+    margin:0 auto;
+    max-width:440px;
+    color:#c4d2e2;
+    font-size:15.5px;
+    line-height:1.55;
+  }
+
+  /* ---------- LAYOUT ---------- */
+  main{
+    max-width:760px;
+    margin:-40px auto 0;
+    padding:0 20px 80px;
+    position:relative;
+    z-index:2;
+  }
+
+  .panel{
+    background:var(--card);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:26px;
+  }
+
+  /* ---------- SEARCH ---------- */
+  .search-row{
+    display:flex;
+    gap:10px;
+    position:relative;
+  }
+
+  #roomNo{
+    flex:1;
+    padding:14px 16px;
+    font-size:18px;
+    font-family:'JetBrains Mono', monospace;
+    letter-spacing:.03em;
+    border:2px solid #e4ded0;
+    border-radius:10px;
+    background:#fbfaf6;
+    color:var(--ink);
+    outline:none;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  #roomNo::placeholder{color:#a8a196; font-family:'Inter',sans-serif; letter-spacing:normal;}
+  #roomNo:focus{
+    border-color:var(--teal);
+    background:#fff;
+  }
+  #roomNo:focus-visible{
+    outline:3px solid rgba(31,122,114,0.35);
+    outline-offset:2px;
+  }
+
+  #searchBtn{
+    padding:0 22px;
+    font-size:15px;
+    font-weight:600;
+    background:var(--teal);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    transition:background .15s ease, transform .1s ease;
+  }
+  #searchBtn:hover{background:var(--teal-dark);}
+  #searchBtn:active{transform:scale(0.97);}
+  #searchBtn:focus-visible{outline:3px solid rgba(31,122,114,0.4); outline-offset:2px;}
+
+  /* suggestions dropdown */
+  .suggestions{
+    position:absolute;
+    top:calc(100% + 6px);
+    left:0;
+    right:94px;
+    background:#fff;
+    border:1px solid #e4ded0;
+    border-radius:10px;
+    box-shadow:var(--shadow);
+    overflow:hidden;
+    z-index:5;
+    display:none;
+  }
+  .suggestions.open{display:block;}
+  .suggestions button{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    width:100%;
+    text-align:left;
+    padding:10px 14px;
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:14px;
+    color:var(--ink);
+  }
+  .suggestions button:hover, .suggestions button.active{background:#f4f1e8;}
+  .suggestions button strong{font-family:'JetBrains Mono',monospace; color:var(--teal-dark);}
+  .suggestions button span{color:var(--muted); font-size:12.5px;}
+
+  .hint{
+    margin:12px 2px 0;
+    font-size:12.5px;
+    color:var(--muted);
+  }
+
+  /* ---------- RESULT: SIGNAGE PLAQUE ---------- */
+  #result{margin-top:22px;}
+
+  .plaque{
+    border-radius:12px;
+    overflow:hidden;
+    border:1px solid #e4ded0;
+    animation: rise .28s ease;
+  }
+  @keyframes rise{
+    from{opacity:0; transform:translateY(6px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  .plaque-strip{
+    height:6px;
+    background:var(--amber);
+  }
+  .plaque-strip.teal{background:var(--teal);}
+  .plaque-body{
+    padding:20px;
+    background:#fffdf8;
+  }
+  .breadcrumb{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:6px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:12.5px;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:10px;
+  }
+  .breadcrumb .arrow{color:#c9c2b2;}
+  .breadcrumb .current{color:var(--ink); font-weight:600;}
+
+  .plaque-room{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .room-badge{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:22px;
+    background:var(--ink);
+    color:#fff;
+    padding:10px 14px;
+    border-radius:8px;
+    letter-spacing:.02em;
+  }
+  .plaque-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:19px;
+    font-weight:600;
+  }
+  .plaque-sub{font-size:13px; color:var(--muted); margin-top:2px;}
+
+  .not-found{
+    padding:20px;
+    border-radius:12px;
+    background:#fdf1ec;
+    border:1px solid #f3d3c4;
+    color:#8a3d20;
+  }
+  .not-found strong{display:block; font-size:16px; margin-bottom:4px; font-family:'Space Grotesk',sans-serif;}
+  .not-found .closest{margin-top:10px; font-size:13.5px;}
+  .not-found .closest button{
+    background:none;
+    border:1px solid #e3a988;
+    color:#8a3d20;
+    padding:4px 10px;
+    border-radius:999px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    cursor:pointer;
+    margin:4px 4px 0 0;
+  }
+  .not-found .closest button:hover{background:#f7e0d4;}
+
+  /* ---------- RECENT ---------- */
+  .recent{margin-top:18px;}
+  .recent-label{font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:8px; font-family:'JetBrains Mono',monospace;}
+  .recent-pills{display:flex; flex-wrap:wrap; gap:8px;}
+  .recent-pills button{
+    background:#f4f1e8;
+    border:1px solid #e4ded0;
+    color:var(--ink);
+    font-family:'JetBrains Mono', monospace;
+    font-size:12.5px;
+    padding:6px 12px;
+    border-radius:999px;
+    cursor:pointer;
+  }
+  .recent-pills button:hover{background:#ece7d8;}
+
+  /* ---------- DIRECTORY ---------- */
+  .directory{margin-top:28px;}
+  .directory-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .directory-head h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:19px;
+    margin:0;
+  }
+  .stats{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .chips{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;}
+  .chip{
+    padding:7px 14px;
+    border-radius:999px;
+    border:1px solid #e4ded0;
+    background:#fff;
+    font-size:13px;
+    font-weight:500;
+    cursor:pointer;
+    color:var(--muted);
+    transition:all .15s ease;
+  }
+  .chip.active{
+    background:var(--ink);
+    color:#fff;
+    border-color:var(--ink);
+  }
+  .chip:hover:not(.active){border-color:var(--teal); color:var(--teal-dark);}
+
+  .room-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(150px,1fr));
+    gap:10px;
+  }
+  .room-card{
+    background:var(--card);
+    border:1px solid #ece7d8;
+    border-radius:10px;
+    padding:12px 14px;
+    cursor:pointer;
+    text-align:left;
+    transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  }
+  .room-card:hover{
+    transform:translateY(-2px);
+    box-shadow:0 8px 18px rgba(15,44,76,0.1);
+    border-color:var(--teal);
+  }
+  .room-card:focus-visible{outline:3px solid rgba(31,122,114,0.4); outline-offset:2px;}
+  .room-card .code{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:15px;
+    color:var(--ink);
+  }
+  .room-card .loc{
+    font-size:11.5px;
+    color:var(--muted);
+    margin-top:3px;
+  }
+  .room-card.pg .code{color:var(--teal-dark);}
+  .room-card.main .code{color:var(--amber-dark);}
+
+  footer{
+    text-align:center;
+    padding:30px 20px 50px;
+    font-size:12.5px;
+    color:var(--muted);
+  }
+
+  @media (max-width:480px){
+    .hero{padding:44px 18px 70px;}
+    .search-row{flex-direction:column;}
+    #searchBtn{padding:14px;}
+    .suggestions{right:0;}
+    .plaque-room{flex-wrap:wrap;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .plaque{animation:none;}
+    .room-card{transition:none;}
+  }
+</style>
 </head>
 <body>
 
-<div class="container">
-
-<h2>College Navigation</h2>
-
-<input type="text" id="roomNo" placeholder="Enter Class Number">
-
-<br>
-
-<button onclick="searchRoom()">Search</button>
-
-<div id="result"></div>
-
+<div class="hero">
+  <span class="eyebrow">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>
+    Campus Directory
+  </span>
+  <h1>Where's my class?</h1>
+  <p>Type a room number to get the block, floor, and exact location — or browse the full directory below.</p>
 </div>
 
+<main>
+  <div class="panel">
+    <div class="search-row">
+      <input type="text" id="roomNo" placeholder="e.g. 3204" autocomplete="off" aria-label="Enter class or room number">
+      <button id="searchBtn" onclick="searchRoom()">Search</button>
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+    <p class="hint">Press Enter to search, or use ↑ ↓ to move through suggestions.</p>
+
+    <div id="result"></div>
+
+    <div class="recent" id="recentWrap" style="display:none;">
+      <div class="recent-label">Recent lookups</div>
+      <div class="recent-pills" id="recentPills"></div>
+    </div>
+  </div>
+
+  <div class="directory">
+    <div class="directory-head">
+      <h2>Full directory</h2>
+      <span class="stats" id="statsLine"></span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="room-grid" id="roomGrid"></div>
+  </div>
+</main>
+
+<footer>Campus Wayfinder · tap any card in the directory to jump straight there</footer>
+
 <script>
-
-function searchRoom(){
-
-let room=document.getElementById("roomNo").value.toUpperCase();
-
-let rooms={
-
+const rooms = {
 "3101":"PG Block - I Floor - Room 3101",
-
 "3102":"PG Block - I Floor - Room 3102",
-
 "3103":"PG Block - I Floor - Room 3103",
-
 "3104":"PG Block - I Floor - Room 3104",
-
 "3105":"PG Block - I Floor - Room 3105",
-
 "3201":"PG Block - II Floor - Room 3201",
-
 "3202":"PG Block - II Floor - Room 3202",
-
 "3203":"PG Block - II Floor - Room 3203",
-
 "3204":"PG Block - II Floor - Room 3204",
-
 "3205":"PG Block - II Floor - Room 3205",
-
 "3301":"PG Block - III Floor - Room 3301",
-
 "3302":"PG Block - III Floor - Room 3302",
-
 "3303":"PG Block - III Floor - Room 3303",
-
 "3304":"PG Block - III Floor - Room 3304",
-
 "3305":"PG Block - III Floor - Room 3305",
-
 "1201":"Main Block - 2nd Floor - Room 1201",
-
 "1202":"Main Block - 2nd Floor - Room 1202",
-
 "1203":"Main Block - 2nd Floor - Room 1203",
-
 "1204":"Main Block - 2nd Floor - Room 1204",
-
 "1205":"Main Block - 2nd Floor - Room 1205",
-
 "1206":"Main Block - 2nd Floor - Room 1206",
-
 "1207":"Main Block - 2nd Floor - Room 1207",
-
 "1208":"Main Block - 2nd Floor - Room 1208",
-
 "2202":"Main Block - 2nd Floor - Room 2202",
-
 "2203":"Main Block - 2nd Floor - Room 2203",
-
 "2204":"Main Block - 2nd Floor - Room 2204",
-
 "1301":"Main Block - 3rd Floor - Room 1301",
-
 "1302":"Main Block - 3rd Floor - Room 1302",
-
 "1303":"Main Block - 3rd Floor - Room 1303",
-
 "1304":"Main Block - 3rd Floor - Room 1304",
-
 "1305":"Main Block - 3rd Floor - Room 1305",
-
 "1306":"Main Block - 3rd Floor - Room 1306"
-
 };
 
-if(rooms[room]){
+const roomCodes = Object.keys(rooms);
+let recent = [];
+let activeBlock = "all";
+let activeSuggestion = -1;
+let currentSuggestions = [];
 
-document.getElementById("result").innerHTML=
-"📍 "+rooms[room];
-
-}
-else{
-
-document.getElementById("result").innerHTML=
-"❌ Class Not Found";
-
+function parseLocation(str){
+  const parts = str.split(" - ");
+  return { block: parts[0], floor: parts[1], label: parts[2] };
 }
 
+/* ---------- SEARCH + PLAQUE ---------- */
+function renderPlaque(code){
+  const loc = parseLocation(rooms[code]);
+  const isPG = loc.block.startsWith("PG");
+  const resultEl = document.getElementById("result");
+  resultEl.innerHTML = `
+    <div class="plaque">
+      <div class="plaque-strip ${isPG ? 'teal' : ''}"></div>
+      <div class="plaque-body">
+        <div class="breadcrumb">
+          <span>${loc.block}</span>
+          <span class="arrow">›</span>
+          <span>${loc.floor}</span>
+          <span class="arrow">›</span>
+          <span class="current">Room ${code}</span>
+        </div>
+        <div class="plaque-room">
+          <div class="room-badge">${code}</div>
+          <div>
+            <div class="plaque-title">${loc.block}</div>
+            <div class="plaque-sub">${loc.floor} · ${loc.label}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
+function renderNotFound(query){
+  const closest = roomCodes
+    .filter(c => c.includes(query))
+    .slice(0, 5);
+  const resultEl = document.getElementById("result");
+  resultEl.innerHTML = `
+    <div class="not-found">
+      <strong>❌ Room "${escapeHtml(query)}" not found</strong>
+      No match in the directory. Double-check the number, or try one of these.
+      ${closest.length ? `
+        <div class="closest">
+          ${closest.map(c => `<button onclick="pickRoom('${c}')">${c}</button>`).join('')}
+        </div>` : ''}
+    </div>
+  `;
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function searchRoom(){
+  const raw = document.getElementById("roomNo").value.trim().toUpperCase();
+  closeSuggestions();
+  if(!raw) return;
+  if(rooms[raw]){
+    renderPlaque(raw);
+    pushRecent(raw);
+  } else {
+    renderNotFound(raw);
+  }
+}
+
+function pickRoom(code){
+  document.getElementById("roomNo").value = code;
+  searchRoom();
+}
+
+function pushRecent(code){
+  recent = recent.filter(c => c !== code);
+  recent.unshift(code);
+  recent = recent.slice(0, 6);
+  renderRecent();
+}
+
+function renderRecent(){
+  const wrap = document.getElementById("recentWrap");
+  const pills = document.getElementById("recentPills");
+  if(recent.length === 0){ wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+  pills.innerHTML = recent.map(c => `<button onclick="pickRoom('${c}')">${c}</button>`).join('');
+}
+
+/* ---------- SUGGESTIONS ---------- */
+const input = document.getElementById("roomNo");
+const suggestBox = document.getElementById("suggestions");
+
+input.addEventListener("input", () => {
+  const val = input.value.trim().toUpperCase();
+  activeSuggestion = -1;
+  if(!val){ closeSuggestions(); return; }
+  currentSuggestions = roomCodes.filter(c => c.startsWith(val)).slice(0, 6);
+  if(currentSuggestions.length === 0){ closeSuggestions(); return; }
+  suggestBox.innerHTML = currentSuggestions.map((c, i) =>
+    `<button data-i="${i}" onclick="pickRoom('${c}')">
+       <strong>${c}</strong><span>${rooms[c].split(" - ")[0]}</span>
+     </button>`
+  ).join('');
+  suggestBox.classList.add("open");
+});
+
+input.addEventListener("keydown", (e) => {
+  if(!suggestBox.classList.contains("open")){
+    if(e.key === "Enter") searchRoom();
+    return;
+  }
+  const items = [...suggestBox.querySelectorAll("button")];
+  if(e.key === "ArrowDown"){
+    e.preventDefault();
+    activeSuggestion = Math.min(activeSuggestion + 1, items.length - 1);
+    highlightSuggestion(items);
+  } else if(e.key === "ArrowUp"){
+    e.preventDefault();
+    activeSuggestion = Math.max(activeSuggestion - 1, 0);
+    highlightSuggestion(items);
+  } else if(e.key === "Enter"){
+    e.preventDefault();
+    if(activeSuggestion >= 0 && currentSuggestions[activeSuggestion]){
+      pickRoom(currentSuggestions[activeSuggestion]);
+    } else {
+      searchRoom();
+    }
+  } else if(e.key === "Escape"){
+    closeSuggestions();
+  }
+});
+
+function highlightSuggestion(items){
+  items.forEach((el, i) => el.classList.toggle("active", i === activeSuggestion));
+}
+
+function closeSuggestions(){
+  suggestBox.classList.remove("open");
+  suggestBox.innerHTML = "";
+  activeSuggestion = -1;
+}
+
+document.addEventListener("click", (e) => {
+  if(!suggestBox.contains(e.target) && e.target !== input){
+    closeSuggestions();
+  }
+});
+
+/* ---------- DIRECTORY ---------- */
+function blockOf(code){
+  return rooms[code].startsWith("PG") ? "PG Block" : "Main Block";
+}
+
+function renderChips(){
+  const blocks = ["all", "PG Block", "Main Block"];
+  const chips = document.getElementById("chips");
+  chips.innerHTML = blocks.map(b => {
+    const label = b === "all" ? "All rooms" : b;
+    return `<button class="chip ${activeBlock === b ? 'active' : ''}" data-block="${b}">${label}</button>`;
+  }).join('');
+  chips.querySelectorAll(".chip").forEach(el => {
+    el.addEventListener("click", () => {
+      activeBlock = el.dataset.block;
+      renderChips();
+      renderGrid();
+    });
+  });
+}
+
+function renderGrid(){
+  const grid = document.getElementById("roomGrid");
+  const codes = roomCodes.filter(c => activeBlock === "all" || blockOf(c) === activeBlock);
+  grid.innerHTML = codes.map(c => {
+    const loc = parseLocation(rooms[c]);
+    const cls = loc.block.startsWith("PG") ? "pg" : "main";
+    return `
+      <button class="room-card ${cls}" onclick="pickRoom('${c}')">
+        <div class="code">${c}</div>
+        <div class="loc">${loc.block} · ${loc.floor}</div>
+      </button>
+    `;
+  }).join('');
+}
+
+function renderStats(){
+  const pgCount = roomCodes.filter(c => blockOf(c) === "PG Block").length;
+  const mainCount = roomCodes.length - pgCount;
+  document.getElementById("statsLine").textContent =
+    `${roomCodes.length} rooms · ${pgCount} PG Block · ${mainCount} Main Block`;
+}
+
+renderChips();
+renderGrid();
+renderStats();
 </script>
-
 </body>
 </html>
