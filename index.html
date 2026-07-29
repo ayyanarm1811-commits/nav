@@ -387,6 +387,71 @@
     .plaque{animation:none;}
     .room-card{transition:none;}
   }
+
+  /* ---------- 3D ROUTE VIEWER ---------- */
+  .scene-panel{
+    margin-top:18px;
+    border-radius:12px;
+    overflow:hidden;
+    border:1px solid #e4ded0;
+    background:linear-gradient(180deg, #0f2c4c, #16385f 55%, #1b4066);
+    position:relative;
+  }
+  .scene-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 16px;
+    background:rgba(0,0,0,0.14);
+    color:#dce6f0;
+  }
+  .scene-head .title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:14px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .scene-head .dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--amber);
+    box-shadow:0 0 0 3px rgba(244,169,0,0.25);
+  }
+  .scene-head .legend{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color:#9fb2c8;
+    letter-spacing:.02em;
+  }
+  #sceneMount{
+    width:100%;
+    height:340px;
+    display:block;
+    cursor:grab;
+    touch-action:none;
+  }
+  #sceneMount:active{cursor:grabbing;}
+  .scene-overlay{
+    position:absolute;
+    inset:52px 0 0 0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    color:#c4d2e2;
+    font-size:13.5px;
+    text-align:center;
+    padding:0 30px;
+    transition:opacity .3s ease;
+  }
+  .scene-overlay span{
+    background:rgba(9,26,46,0.55);
+    padding:8px 16px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,0.12);
+  }
+  .scene-overlay.hidden{opacity:0;}
 </style>
 </head>
 <body>
@@ -415,6 +480,15 @@
       <div class="recent-label">Recent lookups</div>
       <div class="recent-pills" id="recentPills"></div>
     </div>
+  </div>
+
+  <div class="scene-panel">
+    <div class="scene-head">
+      <span class="title"><span class="dot"></span>3D route</span>
+      <span class="legend" id="sceneLegend">drag to rotate · scroll to zoom</span>
+    </div>
+    <div id="sceneMount"></div>
+    <div class="scene-overlay" id="sceneOverlay"><span>Search a room to draw the walking route</span></div>
   </div>
 
   <div class="directory">
@@ -532,6 +606,7 @@ function searchRoom(){
   if(rooms[raw]){
     renderPlaque(raw);
     pushRecent(raw);
+    if(window.goToRoom) window.goToRoom(raw);
   } else {
     renderNotFound(raw);
   }
@@ -663,6 +738,386 @@ function renderStats(){
 renderChips();
 renderGrid();
 renderStats();
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  const mount = document.getElementById("sceneMount");
+  const overlay = document.getElementById("sceneOverlay");
+  const legend = document.getElementById("sceneLegend");
+  if(!mount || typeof THREE === "undefined") return;
+
+  /* ---------- palette ---------- */
+  const COL = {
+    ground:0x0b2038,
+    slabPG:0xdfeae7,
+    slabMain:0xf1e6d2,
+    edge:0x0f2c4c,
+    windowPG:0x2fa79a,
+    windowMain:0xf4a900,
+    routeIdle:0x4a6f8f,
+    routeActive:0xf4a900,
+    pulse:0xffe1a0,
+    label:0xffffff
+  };
+
+  /* ---------- renderer / scene / camera ---------- */
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  mount.appendChild(renderer.domElement);
+
+  function sizeRenderer(){
+    const w = mount.clientWidth, h = mount.clientHeight;
+    if(w === 0 || h === 0) return;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+  }
+
+  /* ---------- lights ---------- */
+  scene.add(new THREE.AmbientLight(0x9fb2c8, 0.9));
+  const sun = new THREE.DirectionalLight(0xfff2d9, 1.05);
+  sun.position.set(9, 14, 8);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -14; sun.shadow.camera.right = 14;
+  sun.shadow.camera.top = 14; sun.shadow.camera.bottom = -14;
+  scene.add(sun);
+  const rim = new THREE.DirectionalLight(0x6fa8ff, 0.35);
+  rim.position.set(-8, 6, -6);
+  scene.add(rim);
+
+  /* ---------- ground ---------- */
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(15, 48),
+    new THREE.MeshStandardMaterial({ color: COL.ground, roughness:0.95 })
+  );
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  const grid = new THREE.GridHelper(30, 30, 0x2c4a6b, 0x1a3452);
+  grid.position.y = 0.01;
+  scene.add(grid);
+
+  /* ---------- label sprites ---------- */
+  function makeLabel(text, opts){
+    opts = opts || {};
+    const scale = opts.scale || 1;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const fontSize = 46;
+    canvas.width = 320; canvas.height = 96;
+    ctx.font = `700 ${fontSize}px 'JetBrains Mono', monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    if(opts.pill){
+      ctx.fillStyle = opts.bg || "rgba(9,26,46,0.85)";
+      roundRect(ctx, 4, 18, canvas.width-8, canvas.height-36, 20);
+      ctx.fill();
+    }
+    ctx.fillStyle = opts.color || "#ffffff";
+    ctx.fillText(text, canvas.width/2, canvas.height/2);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent:true, depthTest:false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(2.6*scale, 0.78*scale, 1);
+    sprite.renderOrder = 10;
+    return sprite;
+  }
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  /* ---------- derive building data from the room directory ---------- */
+  function floorLevel(floorStr){
+    if(/\bIII\b/.test(floorStr)) return 3;
+    if(/\bII\b/.test(floorStr)) return 2;
+    if(/\bI\b/.test(floorStr)) return 1;
+    const n = parseInt(floorStr, 10);
+    return isNaN(n) ? 1 : n;
+  }
+
+  const blockDefs = {
+    "PG Block":   { x:-3.6, color:COL.slabPG,   win:COL.windowPG,   floorTag:(l)=>["I","II","III"][l-1] || (l+"F") },
+    "Main Block": { x: 3.6, color:COL.slabMain, win:COL.windowMain, floorTag:(l)=> l===1 ? "G" : (l+"F") }
+  };
+
+  const byBlock = {};
+  roomCodes.forEach(code => {
+    const loc = parseLocation(rooms[code]);
+    const level = floorLevel(loc.floor);
+    byBlock[loc.block] = byBlock[loc.block] || {};
+    byBlock[loc.block][level] = byBlock[loc.block][level] || [];
+    byBlock[loc.block][level].push(code);
+  });
+
+  const FLOOR_H = 1.35;
+  const GAP = 0.12;
+  const SLAB_W = 3.2, SLAB_D = 2.6;
+
+  const roomMarkers = {};   // code -> THREE.Vector3 (world position)
+  const floorMeshes = {};   // "Block|level" -> mesh (for highlight)
+  const buildingGroup = new THREE.Group();
+  scene.add(buildingGroup);
+
+  Object.keys(blockDefs).forEach(blockName => {
+    const def = blockDefs[blockName];
+    const levels = byBlock[blockName] ? Object.keys(byBlock[blockName]).map(Number) : [1,2,3];
+    const maxLevel = Math.max(3, ...levels);
+
+    for(let level = 1; level <= maxLevel; level++){
+      const y = (level-1) * (FLOOR_H + GAP) + FLOOR_H/2;
+      const slabGeo = new THREE.BoxGeometry(SLAB_W, FLOOR_H, SLAB_D);
+      const slabMat = new THREE.MeshStandardMaterial({ color: def.color, roughness:0.7, metalness:0.05 });
+      const slab = new THREE.Mesh(slabGeo, slabMat);
+      slab.position.set(def.x, y, 0);
+      slab.castShadow = true;
+      slab.receiveShadow = true;
+      buildingGroup.add(slab);
+      floorMeshes[blockName+"|"+level] = slab;
+
+      const edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(slabGeo),
+        new THREE.LineBasicMaterial({ color: COL.edge, transparent:true, opacity:0.35 })
+      );
+      edges.position.copy(slab.position);
+      buildingGroup.add(edges);
+
+      // window strip on the front face
+      const winStrip = new THREE.Mesh(
+        new THREE.BoxGeometry(SLAB_W*0.86, FLOOR_H*0.32, 0.05),
+        new THREE.MeshStandardMaterial({ color: def.win, emissive: def.win, emissiveIntensity:0.25, roughness:0.4 })
+      );
+      winStrip.position.set(def.x, y, SLAB_D/2 + 0.03);
+      buildingGroup.add(winStrip);
+
+      // floor tag sprite
+      const tag = makeLabel(def.floorTag(level), { pill:true, scale:0.55 });
+      tag.position.set(def.x - SLAB_W/2 - 0.55, y, SLAB_D/2 - 0.2);
+      buildingGroup.add(tag);
+
+      // room markers on this floor
+      const codes = (byBlock[blockName] && byBlock[blockName][level]) || [];
+      codes.forEach((code, i) => {
+        const n = codes.length;
+        const spread = SLAB_W*0.78;
+        const px = def.x - spread/2 + (n===1 ? spread/2 : spread * i/(n-1));
+        const pos = new THREE.Vector3(px, y - FLOOR_H*0.18, SLAB_D/2 + 0.09);
+        const dot = new THREE.Mesh(
+          new THREE.SphereGeometry(0.075, 12, 12),
+          new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0x333333, roughness:0.5 })
+        );
+        dot.position.copy(pos);
+        buildingGroup.add(dot);
+        roomMarkers[code] = { pos, dot, blockName, level };
+      });
+    }
+
+    // roof cap
+    const roofY = maxLevel * (FLOOR_H+GAP);
+    const roof = new THREE.Mesh(
+      new THREE.BoxGeometry(SLAB_W+0.15, 0.12, SLAB_D+0.15),
+      new THREE.MeshStandardMaterial({ color: COL.edge, roughness:0.8 })
+    );
+    roof.position.set(def.x, roofY, 0);
+    roof.castShadow = true;
+    buildingGroup.add(roof);
+
+    // block name label above roof
+    const nameTag = makeLabel(blockName.replace(" Block",""), { pill:true, scale:0.75, bg:"rgba(9,26,46,0.85)" });
+    nameTag.position.set(def.x, roofY + 0.55, 0);
+    buildingGroup.add(nameTag);
+  });
+
+  /* ---------- entrance marker ---------- */
+  const ENTRANCE = new THREE.Vector3(0, 0.05, 6.2);
+  const entranceMarker = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.28, 0.28, 0.06, 24),
+    new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0x22334a, emissiveIntensity:0.4 })
+  );
+  entranceMarker.position.copy(ENTRANCE);
+  scene.add(entranceMarker);
+  const entranceTag = makeLabel("ENTRANCE", { pill:true, scale:0.5 });
+  entranceTag.position.set(0, 0.65, 6.2);
+  scene.add(entranceTag);
+
+  /* ---------- route (tube + pulse), built fresh per search ---------- */
+  let routeGroup = new THREE.Group();
+  scene.add(routeGroup);
+  let pulse = null;
+  let pulseT = 0;
+  let destTag = null;
+  let destDot = null;
+
+  function clearRoute(){
+    scene.remove(routeGroup);
+    routeGroup = new THREE.Group();
+    scene.add(routeGroup);
+    pulse = null;
+    Object.values(roomMarkers).forEach(m => m.dot.material.emissive.setHex(0x333333));
+    Object.values(floorMeshes).forEach(mesh => mesh.material.emissiveIntensity = 0);
+  }
+
+  function buildRoute(code){
+    const marker = roomMarkers[code];
+    if(!marker) return;
+    clearRoute();
+
+    const def = blockDefs[marker.blockName];
+    const floorY = marker.pos.y;
+    const approach = new THREE.Vector3(def.x*0.45, 0.06, 4.6);
+    const base = new THREE.Vector3(def.x, 0.06, SLAB_D/2 + 1.1);
+    const corner = new THREE.Vector3(def.x + SLAB_W/2 + 0.35, floorY, SLAB_D/2 + 1.1);
+    const front = new THREE.Vector3(marker.pos.x, floorY, SLAB_D/2 + 0.55);
+
+    const points = [ENTRANCE.clone(), approach, base, corner, front, marker.pos.clone()];
+    const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.15);
+    const tubeGeo = new THREE.TubeGeometry(curve, 120, 0.045, 8, false);
+    const tubeMat = new THREE.MeshStandardMaterial({
+      color: COL.routeActive, emissive: COL.routeActive, emissiveIntensity:0.55, roughness:0.4
+    });
+    const tube = new THREE.Mesh(tubeGeo, tubeMat);
+    tube.castShadow = true;
+    routeGroup.add(tube);
+
+    // dashed guide line just above the tube for a blueprint feel
+    const dashGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(80));
+    const dashMat = new THREE.LineDashedMaterial({ color:0xffffff, dashSize:0.18, gapSize:0.12, transparent:true, opacity:0.5 });
+    const dash = new THREE.Line(dashGeo, dashMat);
+    dash.computeLineDistances();
+    dash.position.y += 0.02;
+    routeGroup.add(dash);
+
+    // pulse traveling marker
+    pulse = new THREE.Mesh(
+      new THREE.SphereGeometry(0.09, 16, 16),
+      new THREE.MeshBasicMaterial({ color: COL.pulse })
+    );
+    routeGroup.add(pulse);
+    pulse.userData.curve = curve;
+    pulseT = 0;
+
+    // destination marker glow
+    destDot = marker.dot;
+    destDot.material.emissive.setHex(COL.routeActive);
+    destDot.material.emissiveIntensity = 1;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.13, 0.17, 24),
+      new THREE.MeshBasicMaterial({ color: COL.pulse, side: THREE.DoubleSide, transparent:true, opacity:0.85 })
+    );
+    ring.position.copy(marker.pos);
+    ring.lookAt(marker.pos.x, marker.pos.y, marker.pos.z+1);
+    routeGroup.add(ring);
+    routeGroup.userData.ring = ring;
+
+    destTag = makeLabel("ROOM " + code, { pill:true, scale:0.6, bg:"rgba(244,169,0,0.92)", color:"#12233b" });
+    destTag.position.set(marker.pos.x, marker.pos.y + 0.5, marker.pos.z + 0.3);
+    routeGroup.add(destTag);
+
+    floorMeshes[marker.blockName+"|"+marker.level].material.emissive.setHex(COL.routeActive);
+    floorMeshes[marker.blockName+"|"+marker.level].material.emissiveIntensity = 0.18;
+
+    // focus camera on this block/floor
+    focusTarget.set(def.x*0.4, floorY + 0.4, 1.2);
+    focusRadius = 9.5;
+    focusTheta = def.x < 0 ? -0.55 : 0.55;
+    focusPhi = 1.05;
+    focusing = true;
+
+    overlay.classList.add("hidden");
+    legend.textContent = "route to Room " + code;
+  }
+
+  window.goToRoom = buildRoute;
+
+  /* ---------- orbit camera ---------- */
+  let theta = 0.7, phi = 1.0, radius = 15;
+  let target = new THREE.Vector3(0, 3, 0);
+  let focusTarget = target.clone(), focusRadius = radius, focusTheta = theta, focusPhi = phi;
+  let focusing = false;
+  let lastInteraction = Date.now();
+  let dragging = false, lastX = 0, lastY = 0;
+
+  function updateCameraFromSpherical(){
+    camera.position.x = target.x + radius * Math.sin(phi) * Math.sin(theta);
+    camera.position.z = target.z + radius * Math.sin(phi) * Math.cos(theta);
+    camera.position.y = target.y + radius * Math.cos(phi);
+    camera.lookAt(target);
+  }
+
+  mount.addEventListener("pointerdown", (e) => {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    focusing = false;
+    lastInteraction = Date.now();
+    mount.setPointerCapture(e.pointerId);
+  });
+  mount.addEventListener("pointermove", (e) => {
+    if(!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    theta -= dx * 0.006;
+    phi = Math.min(Math.max(phi - dy*0.006, 0.35), 1.5);
+    lastInteraction = Date.now();
+  });
+  window.addEventListener("pointerup", () => { dragging = false; });
+  mount.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    radius = Math.min(Math.max(radius + e.deltaY*0.01, 6), 22);
+    lastInteraction = Date.now();
+  }, { passive:false });
+
+  /* ---------- animation loop ---------- */
+  const clock = new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta();
+
+    if(focusing){
+      target.lerp(focusTarget, 0.06);
+      radius += (focusRadius - radius) * 0.06;
+      theta += (focusTheta - theta) * 0.06;
+      phi += (focusPhi - phi) * 0.06;
+    } else if(Date.now() - lastInteraction > 5000 && !dragging){
+      theta += dt * 0.08;
+    }
+    updateCameraFromSpherical();
+
+    if(pulse && pulse.userData.curve){
+      pulseT += dt * 0.18;
+      if(pulseT > 1) pulseT = 0;
+      const p = pulse.userData.curve.getPoint(pulseT);
+      pulse.position.copy(p);
+      const s = 1 + Math.sin(Date.now()*0.008)*0.15;
+      pulse.scale.set(s,s,s);
+    }
+    if(routeGroup.userData.ring){
+      const r = routeGroup.userData.ring;
+      const s = 1 + Math.sin(Date.now()*0.006)*0.25;
+      r.scale.set(s,s,1);
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  updateCameraFromSpherical();
+  sizeRenderer();
+  new ResizeObserver(sizeRenderer).observe(mount);
+  window.addEventListener("resize", sizeRenderer);
+  animate();
+})();
 </script>
 </body>
 </html>
