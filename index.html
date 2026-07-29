@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>College Navigation</title>
+
+<style>
+body{
+    font-family:Arial;
+    background:#f4f4f4;
+    text-align:center;
+    margin-top:80px;
+}
+.container{
+    width:350px;
+    margin:auto;
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 0 10px gray;
+}
+input{
+    width:80%;
+    padding:10px;
+    font-size:18px;
+}
+button{
+    padding:10px 20px;
+    margin-top:15px;
+    font-size:18px;
+    background:green;
+    color:white;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+}
+button:hover{
+    background:darkgreen;
+}
+#result{
+    margin-top:20px;
+    font-size:20px;
+    color:blue;
+    font-weight:bold;
+}
+</style>
+
+</head>
+<body>
+
+<div class="container">
+
+<h2>College Navigation</h2>
+
+<input type="text" id="roomNo" placeholder="Enter Class Number">
+
+<br>
+
+<button onclick="searchRoom()">Search</button>
+
+<div id="result"></div>
+
+</div>
+
+<script>
+
+function searchRoom(){
+
+let room=document.getElementById("roomNo").value.toUpperCase();
+
+let rooms={
+
+"101":"PG Block - Ground Floor - Room 101",
+
+"102":"PG Block - Ground Floor - Room 102",
+
+"111":"PG Block - 1st Floor - Room 111",
+
+"112":"PG Block - 1st Floor - Room 112",
+
+"121":"PG Block - 2nd Floor - Room 121",
+
+"122":"PG Block - 2nd Floor - Room 122",
+
+"201":"Main Block - Ground Floor - Room 201",
+
+"211":"Main Block - 1st Floor - Room 211",
+
+"221":"Main Block - 2nd Floor - Room 221",
+
+"301":"Admin Block - Ground Floor - Room 301",
+
+"311":"Admin Block - 1st Floor - Room 311",
+
+"321":"Admin Block - 2nd Floor - Room 321"
+
+};
+
+if(rooms[room]){
+
+document.getElementById("result").innerHTML=
+"📍 "+rooms[room];
+
+}
+else{
+
+document.getElementById("result").innerHTML=
+"❌ Class Not Found";
+
+}
+
+}
+
+</script>
+
+</body>
+</html>
